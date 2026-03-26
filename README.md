@@ -139,6 +139,29 @@ pboard features list --limit 10
 | `--help` | `-h` | Show help |
 | `--version` | `-v` | Show version |
 
+## MCP Server for Claude Desktop
+
+Use ProductBoard data directly from Claude Desktop as MCP tools. One command to install:
+
+```bash
+pboard mcp install
+```
+
+Then restart Claude Desktop. All ProductBoard tools (features, notes, companies, releases, etc.) will be available in your conversations.
+
+```bash
+# Preview what would be configured
+pboard mcp install --dry-run
+
+# Overwrite existing installation
+pboard mcp install --force
+
+# Remove the MCP server
+pboard mcp uninstall
+```
+
+The MCP server exposes ~50 tools covering every pboard CLI command. Results default to 25 items per query to keep Claude's context manageable.
+
 ## Claude Code integration
 
 Install a skill that teaches Claude Code agents how to use `pboard`:

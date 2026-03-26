@@ -51,6 +51,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(newJiraIntegrationsCmd())
 	rootCmd.AddCommand(newWebhooksCmd())
 	rootCmd.AddCommand(newSkillCmd())
+	rootCmd.AddCommand(newMcpCmd())
 
 	return rootCmd
 }
