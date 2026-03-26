@@ -50,6 +50,7 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(newPluginIntegrationsCmd())
 	rootCmd.AddCommand(newJiraIntegrationsCmd())
 	rootCmd.AddCommand(newWebhooksCmd())
+	rootCmd.AddCommand(newSkillCmd())
 
 	return rootCmd
 }
