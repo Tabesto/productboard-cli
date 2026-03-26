@@ -23,6 +23,7 @@ Examples:
 	cmd.AddCommand(newFeaturesListCmd())
 	cmd.AddCommand(newFeaturesGetCmd())
 	cmd.AddCommand(newFeaturesLinksCmd())
+	cmd.AddCommand(newFeaturesHealthCmd())
 
 	return cmd
 }

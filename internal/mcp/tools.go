@@ -35,6 +35,24 @@ func registerTools(s *server.MCPServer) {
 		mcp.WithNumber("limit", mcp.Description("Maximum number of results (default 25)")),
 	), handleListFeatureObjectives)
 
+	// --- Feature Health ---
+	s.AddTool(mcp.NewTool("features_health_list",
+		mcp.WithDescription("List features with their health update information, with optional filters. Returns features sorted by health update date (most recent first)."),
+		mcp.WithString("updated_since", mcp.Description("Show features with health updated on or after this date (YYYY-MM-DD)")),
+		mcp.WithString("updated_before", mcp.Description("Show features with health updated before this date (YYYY-MM-DD)")),
+		mcp.WithString("status", mcp.Description("Filter by feature status name (e.g., 'In Progress')")),
+		mcp.WithString("owner", mcp.Description("Filter by feature owner email")),
+		mcp.WithString("health_status", mcp.Description("Filter by health status (on-track, at-risk, off-track)")),
+		mcp.WithBoolean("include_archived", mcp.Description("Include archived features (default false)")),
+		mcp.WithBoolean("include_no_health", mcp.Description("Include features without health updates (default false)")),
+		mcp.WithNumber("limit", mcp.Description("Maximum number of results (default 25)")),
+	), handleFeaturesHealthList)
+
+	s.AddTool(mcp.NewTool("features_health_get",
+		mcp.WithDescription("Get the full health update details for a specific feature"),
+		mcp.WithString("id", mcp.Required(), mcp.Description("Feature ID (UUID)")),
+	), handleFeaturesHealthGet)
+
 	// --- Notes ---
 	s.AddTool(mcp.NewTool("list_notes",
 		mcp.WithDescription("List ProductBoard notes with optional filters"),

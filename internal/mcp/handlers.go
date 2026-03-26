@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/tabesto/productboard-cli/internal/client"
 	"github.com/tabesto/productboard-cli/internal/config"
+	"github.com/tabesto/productboard-cli/internal/health"
 )
 
 func getClient() (*client.Client, error) {
@@ -1036,6 +1038,79 @@ func handleGetJiraIntegrationConnection(_ context.Context, request mcp.CallToolR
 		return mcp.NewToolResultError("feature_id is required"), nil
 	}
 	data, err := c.GetSingle(fmt.Sprintf("/jira-integrations/%s/connections/%s", id, featureID))
+	if err != nil {
+		return errorResult(err), nil
+	}
+	s, err := toJSON(data)
+	if err != nil {
+		return errorResult(err), nil
+	}
+	return mcp.NewToolResultText(s), nil
+}
+
+// --- Feature Health ---
+
+func handleFeaturesHealthList(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := getClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	// Build server-side params (only archived is server-side)
+	params := map[string]string{}
+	if !request.GetBool("include_archived", false) {
+		params["archived"] = "false"
+	}
+
+	// Fetch ALL features for client-side filtering
+	data, err := c.GetList("/features", params, 0)
+	if err != nil {
+		return errorResult(err), nil
+	}
+
+	// Parse date filters
+	opts := health.FilterOpts{
+		IncludeNoHealth: request.GetBool("include_no_health", false),
+		IncludeArchived: request.GetBool("include_archived", false),
+		HealthStatus:    request.GetString("health_status", ""),
+		StatusName:      request.GetString("status", ""),
+		OwnerEmail:      request.GetString("owner", ""),
+	}
+	if since := request.GetString("updated_since", ""); since != "" {
+		t, err := time.Parse("2006-01-02", since)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("invalid updated_since date format %q, expected YYYY-MM-DD", since)), nil
+		}
+		opts.UpdatedSince = &t
+	}
+	if before := request.GetString("updated_before", ""); before != "" {
+		t, err := time.Parse("2006-01-02", before)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("invalid updated_before date format %q, expected YYYY-MM-DD", before)), nil
+		}
+		opts.UpdatedBefore = &t
+	}
+
+	filtered := health.FilterAndSort(data, opts)
+	filtered = health.ApplyLimit(filtered, getLimit(request))
+
+	s, err := toJSON(filtered)
+	if err != nil {
+		return errorResult(err), nil
+	}
+	return mcp.NewToolResultText(s), nil
+}
+
+func handleFeaturesHealthGet(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := getClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+	id, err := request.RequireString("id")
+	if err != nil {
+		return mcp.NewToolResultError("id is required"), nil
+	}
+	data, err := c.GetSingle("/features/" + id)
 	if err != nil {
 		return errorResult(err), nil
 	}
