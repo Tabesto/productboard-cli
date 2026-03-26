@@ -21,13 +21,19 @@ go install github.com/tabesto/productboard-cli/cmd/pboard@latest
 
 Set your ProductBoard API token using one of these methods:
 
+### One-command setup
+
+```bash
+pboard configure pb_your_token_here
+```
+
 ### Interactive setup
 
 ```bash
 pboard configure
 ```
 
-This saves the token to `~/.config/pboard/config.yaml` (mode 600).
+Both methods save the token to `~/.config/pboard/config.yaml` (mode 600).
 
 ### Environment variable
 

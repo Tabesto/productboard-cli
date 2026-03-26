@@ -12,18 +12,32 @@ import (
 
 func newConfigureCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "configure",
+		Use:   "configure [token]",
 		Short: "Configure API token for ProductBoard",
-		Long:  "Interactively configure your ProductBoard API token.\nThe token is stored in ~/.config/pboard/config.yaml with restricted permissions (mode 600).",
+		Long: `Configure your ProductBoard API token.
+The token is stored in ~/.config/pboard/config.yaml with restricted permissions (mode 600).
+
+Pass the token as an argument for one-command setup, or omit it for an interactive prompt.
+
+Examples:
+  pboard configure pb_your_token_here
+  pboard configure`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Print("Enter your ProductBoard API token: ")
-			reader := bufio.NewReader(os.Stdin)
-			token, err := reader.ReadString('\n')
-			if err != nil {
-				return fmt.Errorf("failed to read input: %w", err)
+			var token string
+
+			if len(args) == 1 {
+				token = strings.TrimSpace(args[0])
+			} else {
+				fmt.Print("Enter your ProductBoard API token: ")
+				reader := bufio.NewReader(os.Stdin)
+				input, err := reader.ReadString('\n')
+				if err != nil {
+					return fmt.Errorf("failed to read input: %w", err)
+				}
+				token = strings.TrimSpace(input)
 			}
 
-			token = strings.TrimSpace(token)
 			if token == "" {
 				return fmt.Errorf("token cannot be empty")
 			}
