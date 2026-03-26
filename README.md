@@ -8,7 +8,7 @@ A read-only command-line tool for browsing ProductBoard data. Supports all GET e
 
 ```bash
 brew tap tabesto/tap
-brew install pboard
+brew install productboard-cli
 ```
 
 ### From source
