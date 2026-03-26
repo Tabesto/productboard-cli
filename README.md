@@ -139,6 +139,27 @@ pboard features list --limit 10
 | `--help` | `-h` | Show help |
 | `--version` | `-v` | Show version |
 
+## Claude Code integration
+
+Install a skill that teaches Claude Code agents how to use `pboard`:
+
+```bash
+pboard skill install
+```
+
+This writes a usage guide to `~/.claude/commands/pboard.md`, making it available across all Claude Code sessions. Agents will automatically know every command, flag, and workflow.
+
+```bash
+# Overwrite an existing skill
+pboard skill install --force
+
+# Preview without writing
+pboard skill install --dry-run
+
+# Remove the skill
+pboard skill uninstall
+```
+
 ## Shell completion
 
 ```bash
