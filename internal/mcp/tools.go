@@ -346,4 +346,29 @@ func registerTools(s *server.MCPServer) {
 		mcp.WithDescription("Get a ProductBoard webhook by ID"),
 		mcp.WithString("id", mcp.Required(), mcp.Description("Webhook ID")),
 	), handleGetWebhook)
+
+	// --- Members (V2 only) ---
+	s.AddTool(mcp.NewTool("list_members",
+		mcp.WithDescription("List ProductBoard workspace members (requires API V2)"),
+		mcp.WithString("role", mcp.Description("Filter by role (admin, maker, viewer, contributor)")),
+		mcp.WithString("query", mcp.Description("Search by name or email")),
+		mcp.WithNumber("limit", mcp.Description("Maximum number of results (default 25)")),
+	), handleListMembers)
+
+	s.AddTool(mcp.NewTool("get_member",
+		mcp.WithDescription("Get a ProductBoard workspace member by ID (requires API V2)"),
+		mcp.WithString("id", mcp.Required(), mcp.Description("Member ID")),
+	), handleGetMember)
+
+	// --- Teams (V2 only) ---
+	s.AddTool(mcp.NewTool("list_teams",
+		mcp.WithDescription("List ProductBoard teams (requires API V2)"),
+		mcp.WithString("query", mcp.Description("Search teams by name")),
+		mcp.WithNumber("limit", mcp.Description("Maximum number of results (default 25)")),
+	), handleListTeams)
+
+	s.AddTool(mcp.NewTool("get_team",
+		mcp.WithDescription("Get a ProductBoard team by ID (requires API V2)"),
+		mcp.WithString("id", mcp.Required(), mcp.Description("Team ID")),
+	), handleGetTeam)
 }

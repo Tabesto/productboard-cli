@@ -1,6 +1,9 @@
 package client
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Exit codes for CLI error types.
 const (
@@ -27,15 +30,23 @@ func (e *APIError) Error() string {
 func NewAPIError(statusCode int, body string) *APIError {
 	switch statusCode {
 	case 401:
+		msg := "Authentication failed. Check your API token via `pboard configure` or PRODUCTBOARD_API_TOKEN env var."
+		if detail := extractV2ErrorDetail(body); detail != "" {
+			msg = fmt.Sprintf("Authentication failed: %s", detail)
+		}
 		return &APIError{
 			StatusCode: 401,
-			Message:    "Authentication failed. Check your API token via `pboard configure` or PRODUCTBOARD_API_TOKEN env var.",
+			Message:    msg,
 			ExitCode:   ExitAuthError,
 		}
 	case 403:
+		msg := "Access denied. Your API token may not have permission for this resource."
+		if detail := extractV2ErrorDetail(body); detail != "" {
+			msg = fmt.Sprintf("Access denied: %s", detail)
+		}
 		return &APIError{
 			StatusCode: 403,
-			Message:    "Access denied. Your API token may not have permission for this resource.",
+			Message:    msg,
 			ExitCode:   ExitAuthError,
 		}
 	case 404:
@@ -60,7 +71,12 @@ func NewAPIError(statusCode int, body string) *APIError {
 		}
 		msg := fmt.Sprintf("API error (%d)", statusCode)
 		if body != "" {
-			msg = fmt.Sprintf("API error (%d): %s", statusCode, body)
+			// Try V2 error format first
+			if detail := extractV2ErrorDetail(body); detail != "" {
+				msg = fmt.Sprintf("API error (%d): %s", statusCode, detail)
+			} else {
+				msg = fmt.Sprintf("API error (%d): %s", statusCode, body)
+			}
 		}
 		return &APIError{
 			StatusCode: statusCode,
@@ -68,6 +84,26 @@ func NewAPIError(statusCode int, body string) *APIError {
 			ExitCode:   ExitGeneralError,
 		}
 	}
+}
+
+// extractV2ErrorDetail attempts to parse a V2 error response and extract the detail message.
+func extractV2ErrorDetail(body string) string {
+	var v2Err struct {
+		Errors []struct {
+			Detail string `json:"detail"`
+			Title  string `json:"title"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal([]byte(body), &v2Err); err != nil {
+		return ""
+	}
+	if len(v2Err.Errors) == 0 {
+		return ""
+	}
+	if v2Err.Errors[0].Detail != "" {
+		return v2Err.Errors[0].Detail
+	}
+	return v2Err.Errors[0].Title
 }
 
 // NewNetworkError creates a network error.

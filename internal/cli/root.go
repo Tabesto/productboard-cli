@@ -14,8 +14,9 @@ var (
 	// Version is set at build time by GoReleaser.
 	Version = "dev"
 
-	outputFormat string
-	limitFlag    int
+	outputFormat  string
+	limitFlag     int
+	apiVersionFlag string
 )
 
 // NewRootCmd creates the root command.
@@ -23,12 +24,13 @@ func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
 		Use:   "pboard",
 		Short: "ProductBoard CLI - read-only access to ProductBoard API",
-		Long:  "pboard is a command-line tool for browsing ProductBoard data.\nIt provides read-only access to features, products, notes, releases, and more.",
+		Long:  "pboard is a command-line tool for browsing ProductBoard data.\nIt provides read-only access to features, products, notes, releases, and more.\n\nSupports both API V1 and V2 (default). Use --api-version to switch.",
 		Version: Version,
 	}
 
 	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", output.FormatTable, "Output format: table or json")
 	rootCmd.PersistentFlags().IntVarP(&limitFlag, "limit", "l", 0, "Maximum number of results (0 = all)")
+	rootCmd.PersistentFlags().StringVar(&apiVersionFlag, "api-version", "", "API version to use: 1 or 2 (default \"2\")")
 
 	// Register all subcommands
 	rootCmd.AddCommand(newConfigureCmd())
@@ -50,6 +52,8 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.AddCommand(newPluginIntegrationsCmd())
 	rootCmd.AddCommand(newJiraIntegrationsCmd())
 	rootCmd.AddCommand(newWebhooksCmd())
+	rootCmd.AddCommand(newMembersCmd())
+	rootCmd.AddCommand(newTeamsCmd())
 	rootCmd.AddCommand(newSkillCmd())
 	rootCmd.AddCommand(newMcpCmd())
 
@@ -68,6 +72,10 @@ func getClient() (*client.Client, error) {
 	cfg, err := config.Load()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+	// --api-version flag takes highest precedence
+	if apiVersionFlag != "" {
+		cfg.APIVersion = apiVersionFlag
 	}
 	return client.New(cfg)
 }

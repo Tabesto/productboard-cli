@@ -9,51 +9,55 @@ import (
 )
 
 const (
-	EnvTokenKey    = "PRODUCTBOARD_API_TOKEN"
-	ConfigDir      = ".config/pboard"
-	ConfigFileName = "config"
-	ConfigFileType = "yaml"
-	DefaultBaseURL = "https://api.productboard.com"
+	EnvTokenKey       = "PRODUCTBOARD_API_TOKEN"
+	EnvAPIVersionKey  = "PRODUCTBOARD_API_VERSION"
+	ConfigDir         = ".config/pboard"
+	ConfigFileName    = "config"
+	ConfigFileType    = "yaml"
+	DefaultBaseURL    = "https://api.productboard.com"
+	DefaultAPIVersion = "2"
 )
 
 // Config holds application configuration.
 type Config struct {
-	APIToken string
-	BaseURL  string
+	APIToken   string
+	BaseURL    string
+	APIVersion string
 }
 
-// Load reads configuration from env var and config file.
-// Env var PRODUCTBOARD_API_TOKEN takes precedence over config file.
+// Load reads configuration from config file and env vars.
+// Env vars take precedence over config file values.
 func Load() (*Config, error) {
 	cfg := &Config{
-		BaseURL: DefaultBaseURL,
+		BaseURL:    DefaultBaseURL,
+		APIVersion: DefaultAPIVersion,
 	}
 
-	// Check environment variable first (highest precedence)
+	// Try config file first (lowest precedence)
+	home, err := os.UserHomeDir()
+	if err == nil {
+		configPath := filepath.Join(home, ConfigDir)
+		viper.SetConfigName(ConfigFileName)
+		viper.SetConfigType(ConfigFileType)
+		viper.AddConfigPath(configPath)
+
+		if err := viper.ReadInConfig(); err == nil {
+			cfg.APIToken = viper.GetString("api_token")
+			if url := viper.GetString("api_url"); url != "" {
+				cfg.BaseURL = url
+			}
+			if ver := viper.GetString("api_version"); ver != "" {
+				cfg.APIVersion = ver
+			}
+		}
+	}
+
+	// Env vars override config file
 	if token := os.Getenv(EnvTokenKey); token != "" {
 		cfg.APIToken = token
-		return cfg, nil
 	}
-
-	// Try config file
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return cfg, nil
-	}
-
-	configPath := filepath.Join(home, ConfigDir)
-	viper.SetConfigName(ConfigFileName)
-	viper.SetConfigType(ConfigFileType)
-	viper.AddConfigPath(configPath)
-
-	if err := viper.ReadInConfig(); err != nil {
-		// Config file not found is not an error — token may be set later
-		return cfg, nil
-	}
-
-	cfg.APIToken = viper.GetString("api_token")
-	if url := viper.GetString("api_url"); url != "" {
-		cfg.BaseURL = url
+	if ver := os.Getenv(EnvAPIVersionKey); ver != "" {
+		cfg.APIVersion = ver
 	}
 
 	return cfg, nil
@@ -68,8 +72,8 @@ func ConfigFilePath() (string, error) {
 	return filepath.Join(home, ConfigDir, ConfigFileName+".yaml"), nil
 }
 
-// WriteToken writes the API token to the config file with mode 600.
-func WriteToken(token string) error {
+// WriteConfig writes the API token and version to the config file with mode 600.
+func WriteConfig(token, apiVersion string) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("cannot determine home directory: %w", err)
@@ -81,7 +85,10 @@ func WriteToken(token string) error {
 	}
 
 	filePath := filepath.Join(configPath, ConfigFileName+".yaml")
-	content := fmt.Sprintf("api_token: %q\napi_url: %q\n", token, DefaultBaseURL)
+	if apiVersion == "" {
+		apiVersion = DefaultAPIVersion
+	}
+	content := fmt.Sprintf("api_token: %q\napi_url: %q\napi_version: %q\n", token, DefaultBaseURL, apiVersion)
 
 	if err := os.WriteFile(filePath, []byte(content), 0600); err != nil {
 		return fmt.Errorf("cannot write config file: %w", err)
