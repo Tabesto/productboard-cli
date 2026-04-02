@@ -80,11 +80,9 @@ func newFeaturesHealthListCmd() *cobra.Command {
 			if !includeArchived {
 				params["archived"] = "false"
 			}
-			// V2 entities endpoint returns default fields only; request all
-			// fields to ensure lastHealthUpdate is included.
-			// V2 entities endpoint returns default fields only; request health
-			// field in addition to defaults for health update data.
-			// Comma-separated values are split into multiple fields[] params by the client.
+			// V2 entities endpoint returns default fields only, so request the
+			// fields needed for the health listing. Comma-separated values are
+			// split into multiple fields[] params by the client.
 			if c.IsV2() {
 				params["fields[]"] = "health,name,status,owner"
 			}
@@ -163,10 +161,11 @@ func newFeaturesHealthGetCmd() *cobra.Command {
 			}
 
 			path := fmt.Sprintf("/features/%s", args[0])
+			var params map[string]string
 			if c.IsV2() {
-				path += "?fields=all"
+				params = map[string]string{"fields[]": "health,name,status,owner"}
 			}
-			feature, err := c.GetSingle(path)
+			feature, err := c.GetSingleWithParams(path, params)
 			if err != nil {
 				handleError(err)
 			}

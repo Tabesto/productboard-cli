@@ -94,8 +94,8 @@
 
 - [x] T030 [US3] Add V2 path mapping for custom fields — V1 `/hierarchy-entities/custom-fields` maps to V2 `/v2/entities/configurations` — add translation and response extraction in `internal/client/v2.go`
 - [x] T031 [US3] Add V2 path mapping for custom field values — V1 `/hierarchy-entities/custom-fields-values` maps to V2 `/v2/entities/fields/{id}/values` — update translation in `internal/client/v2.go`
-- [x] T030 [US3] Update `pboard custom-fields list/get` and `pboard custom-fields values list/get` to handle V2 configuration response shape in `internal/cli/custom_fields.go`
-- [x] T031 [US3] Add V2 path mapping for feature statuses — V1 `/feature-statuses` maps to V2 `/v2/entities/configurations/feature` (extract status field from config) — update in `internal/client/v2.go` and `internal/cli/feature_statuses.go`
+- [x] T032 [US3] Update `pboard custom-fields list/get` and `pboard custom-fields values list/get` to handle V2 configuration response shape in `internal/cli/custom_fields.go`
+- [x] T033 [US3] Add V2 path mapping for feature statuses — V1 `/feature-statuses` maps to V2 `/v2/entities/configurations/feature` (extract status field from config) — update in `internal/client/v2.go` and `internal/cli/feature_statuses.go`
 
 **Checkpoint**: Custom fields and statuses work with V2
 

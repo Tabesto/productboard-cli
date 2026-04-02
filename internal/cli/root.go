@@ -30,7 +30,7 @@ func NewRootCmd() *cobra.Command {
 
 	rootCmd.PersistentFlags().StringVarP(&outputFormat, "output", "o", output.FormatTable, "Output format: table or json")
 	rootCmd.PersistentFlags().IntVarP(&limitFlag, "limit", "l", 0, "Maximum number of results (0 = all)")
-	rootCmd.PersistentFlags().StringVar(&apiVersionFlag, "api-version", "", "API version to use: 1 or 2 (default \"2\")")
+	rootCmd.PersistentFlags().StringVar(&apiVersionFlag, "api-version", "", "API version to use: 1 or 2 (empty = use config/env; default 2)")
 
 	// Register all subcommands
 	rootCmd.AddCommand(newConfigureCmd())

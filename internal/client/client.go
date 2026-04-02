@@ -29,6 +29,18 @@ func New(cfg *config.Config) (*Client, error) {
 		}
 	}
 
+	// Validate API version
+	switch cfg.APIVersion {
+	case "", "1", "2":
+		// valid
+	default:
+		return nil, &APIError{
+			StatusCode: 0,
+			Message:    fmt.Sprintf("Invalid API version %q. Supported values: 1, 2.", cfg.APIVersion),
+			ExitCode:   ExitInvalidInput,
+		}
+	}
+
 	return &Client{
 		httpClient: &http.Client{},
 		baseURL:    strings.TrimRight(cfg.BaseURL, "/"),
@@ -113,7 +125,12 @@ func (c *Client) IsV2() bool {
 
 // GetSingle fetches a single resource and returns the data object.
 func (c *Client) GetSingle(path string) (map[string]interface{}, error) {
-	body, err := c.Get(path, nil)
+	return c.GetSingleWithParams(path, nil)
+}
+
+// GetSingleWithParams fetches a single resource with query parameters and returns the data object.
+func (c *Client) GetSingleWithParams(path string, params map[string]string) (map[string]interface{}, error) {
+	body, err := c.Get(path, params)
 	if err != nil {
 		return nil, err
 	}

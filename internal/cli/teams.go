@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 	"github.com/tabesto/productboard-cli/internal/client"
@@ -13,16 +12,14 @@ func newTeamsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "teams",
 		Short: "List and inspect ProductBoard teams (V2 only)",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			c, err := getClient()
 			if err != nil {
-				return err
+				handleError(err)
 			}
 			if !c.IsV2() {
-				fmt.Fprintln(os.Stderr, "Error: The 'teams' command requires API V2. Use --api-version 2 or update your config.")
-				return &client.APIError{StatusCode: 0, Message: "command requires API V2", ExitCode: client.ExitInvalidInput}
+				handleError(&client.APIError{StatusCode: 0, Message: "The 'teams' command requires API V2. Use --api-version 2 or update your config.", ExitCode: client.ExitInvalidInput})
 			}
-			return nil
 		},
 	}
 

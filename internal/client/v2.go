@@ -90,9 +90,11 @@ func translateV2Path(path string) (v2Path string, extraParams map[string]string)
 		}
 	}
 
-	// Feature-release assignments — V2 uses entity relationships
+	// Feature-release assignments do not have a direct /v2/feature-release-assignments
+	// endpoint. Until these V1 routes are translated to the proper V2 entity
+	// relationship endpoints, do not rewrite them to a likely-invalid V2 path.
 	if path == "/feature-release-assignments" || path == "/feature-release-assignments/assignment" {
-		return "/v2" + path, extraParams
+		return path, extraParams
 	}
 
 	// Special cases
@@ -107,8 +109,15 @@ func translateV2Path(path string) (v2Path string, extraParams map[string]string)
 		return "/v2/entities/fields/values", extraParams
 	}
 	if strings.HasPrefix(path, "/hierarchy-entities/custom-fields-values/") {
-		suffix := strings.TrimPrefix(path, "/hierarchy-entities/custom-fields-values")
-		return "/v2/entities/fields" + suffix + "/values", extraParams
+		suffix := strings.TrimPrefix(path, "/hierarchy-entities/custom-fields-values/")
+		parts := strings.SplitN(suffix, "/", 2)
+		if len(parts) > 0 && parts[0] != "" {
+			v2Path = "/v2/entities/fields/" + parts[0] + "/values"
+			if len(parts) == 2 {
+				v2Path += "/" + parts[1]
+			}
+			return v2Path, extraParams
+		}
 	}
 
 	// Fallback: just prefix with /v2

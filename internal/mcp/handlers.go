@@ -1113,7 +1113,11 @@ func handleFeaturesHealthGet(_ context.Context, request mcp.CallToolRequest) (*m
 	if err != nil {
 		return mcp.NewToolResultError("id is required"), nil
 	}
-	data, err := c.GetSingle("/features/" + id)
+	var params map[string]string
+	if c.IsV2() {
+		params = map[string]string{"fields[]": "health,name,status,owner"}
+	}
+	data, err := c.GetSingleWithParams("/features/"+id, params)
 	if err != nil {
 		return errorResult(err), nil
 	}
