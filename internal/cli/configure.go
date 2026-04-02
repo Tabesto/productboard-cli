@@ -42,7 +42,7 @@ Examples:
 				return fmt.Errorf("token cannot be empty")
 			}
 
-			if err := config.WriteToken(token); err != nil {
+			if err := config.WriteConfig(token, config.DefaultAPIVersion); err != nil {
 				return err
 			}
 

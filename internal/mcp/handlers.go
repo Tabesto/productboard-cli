@@ -1061,6 +1061,9 @@ func handleFeaturesHealthList(_ context.Context, request mcp.CallToolRequest) (*
 	if !request.GetBool("include_archived", false) {
 		params["archived"] = "false"
 	}
+	if c.IsV2() {
+		params["fields[]"] = "health,name,status,owner"
+	}
 
 	// Fetch ALL features for client-side filtering
 	data, err := c.GetList("/features", params, 0)
@@ -1110,7 +1113,11 @@ func handleFeaturesHealthGet(_ context.Context, request mcp.CallToolRequest) (*m
 	if err != nil {
 		return mcp.NewToolResultError("id is required"), nil
 	}
-	data, err := c.GetSingle("/features/" + id)
+	var params map[string]string
+	if c.IsV2() {
+		params = map[string]string{"fields[]": "health,name,status,owner"}
+	}
+	data, err := c.GetSingleWithParams("/features/"+id, params)
 	if err != nil {
 		return errorResult(err), nil
 	}
@@ -1149,6 +1156,101 @@ func handleGetWebhook(_ context.Context, request mcp.CallToolRequest) (*mcp.Call
 		return mcp.NewToolResultError("id is required"), nil
 	}
 	data, err := c.GetSingle("/webhooks/" + id)
+	if err != nil {
+		return errorResult(err), nil
+	}
+	s, err := toJSON(data)
+	if err != nil {
+		return errorResult(err), nil
+	}
+	return mcp.NewToolResultText(s), nil
+}
+
+// --- Members (V2 only) ---
+
+func handleListMembers(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := getClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+	if !c.IsV2() {
+		return mcp.NewToolResultError("The 'list_members' tool requires API V2."), nil
+	}
+	params := map[string]string{
+		"query":   request.GetString("query", ""),
+		"roles[]": request.GetString("role", ""),
+	}
+	data, err := c.GetList("/members", params, getLimit(request))
+	if err != nil {
+		return errorResult(err), nil
+	}
+	s, err := toJSON(data)
+	if err != nil {
+		return errorResult(err), nil
+	}
+	return mcp.NewToolResultText(s), nil
+}
+
+func handleGetMember(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := getClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+	if !c.IsV2() {
+		return mcp.NewToolResultError("The 'get_member' tool requires API V2."), nil
+	}
+	id, err := request.RequireString("id")
+	if err != nil {
+		return mcp.NewToolResultError("id is required"), nil
+	}
+	data, err := c.GetSingle("/members/" + id)
+	if err != nil {
+		return errorResult(err), nil
+	}
+	s, err := toJSON(data)
+	if err != nil {
+		return errorResult(err), nil
+	}
+	return mcp.NewToolResultText(s), nil
+}
+
+// --- Teams (V2 only) ---
+
+func handleListTeams(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := getClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+	if !c.IsV2() {
+		return mcp.NewToolResultError("The 'list_teams' tool requires API V2."), nil
+	}
+	params := map[string]string{
+		"query": request.GetString("query", ""),
+	}
+	data, err := c.GetList("/teams", params, getLimit(request))
+	if err != nil {
+		return errorResult(err), nil
+	}
+	s, err := toJSON(data)
+	if err != nil {
+		return errorResult(err), nil
+	}
+	return mcp.NewToolResultText(s), nil
+}
+
+func handleGetTeam(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	c, err := getClient()
+	if err != nil {
+		return errorResult(err), nil
+	}
+	if !c.IsV2() {
+		return mcp.NewToolResultError("The 'get_team' tool requires API V2."), nil
+	}
+	id, err := request.RequireString("id")
+	if err != nil {
+		return mcp.NewToolResultError("id is required"), nil
+	}
+	data, err := c.GetSingle("/teams/" + id)
 	if err != nil {
 		return errorResult(err), nil
 	}

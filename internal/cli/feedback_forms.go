@@ -2,6 +2,7 @@ package cli
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/tabesto/productboard-cli/internal/client"
 	"github.com/tabesto/productboard-cli/internal/output"
 )
 
@@ -9,6 +10,15 @@ func newFeedbackFormsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "feedback-forms",
 		Short: "Manage ProductBoard feedback form configurations",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			c, err := getClient()
+			if err != nil {
+				handleError(err)
+			}
+			if c.IsV2() {
+				handleError(&client.APIError{StatusCode: 0, Message: "The 'feedback-forms' command is not available with API V2. Use --api-version 1 to access this command.", ExitCode: client.ExitInvalidInput})
+			}
+		},
 	}
 
 	cmd.AddCommand(newFeedbackFormsListCmd())

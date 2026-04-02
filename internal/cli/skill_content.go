@@ -21,6 +21,7 @@ pboard configure <token>
 |------|-------------|
 | ` + "`-o json`" + ` | Output as JSON (default: table). **Always use ` + "`-o json`" + ` when you need to parse output programmatically.** |
 | ` + "`-l N`" + ` | Limit results to N items (default: 0 = all) |
+| ` + "`--api-version`" + ` | API version: 1 or 2 (default: 2). Use ` + "`--api-version 1`" + ` for V1-only commands. |
 
 ## Command Reference
 
@@ -34,6 +35,14 @@ pboard features links objectives <id>    # Linked objectives
 **List flags:** ` + "`--status-id`" + `, ` + "`--status-name`" + `, ` + "`--parent-id`" + `, ` + "`--archived`" + ` (true/false), ` + "`--owner-email`" + `, ` + "`--note-id`" + `
 **List columns:** ID, Name, Status, Owner, Archived
 **Get fields:** ID, Name, Status, Owner, Archived, Description
+
+### Feature Health
+` + "```bash" + `
+pboard features health list [flags]      # List features with health updates
+pboard features health get <id>          # Get health details for a feature
+` + "```" + `
+**List flags:** ` + "`--updated-since`" + ` (YYYY-MM-DD), ` + "`--updated-before`" + `, ` + "`--status`" + `, ` + "`--owner`" + `, ` + "`--health-status`" + ` (on-track/at-risk/off-track), ` + "`--include-archived`" + `, ` + "`--include-no-health`" + `
+**List columns:** Feature Name, Status, Owner, Health, Health Updated, Message
 
 ### Products
 ` + "```bash" + `
@@ -144,12 +153,29 @@ pboard custom-fields values get --custom-field-id <cfid> --hierarchy-entity-id <
 **Values list flags:** ` + "`--type`" + `, ` + "`--custom-field-id`" + `, ` + "`--hierarchy-entity-id`" + `
 **List columns:** ID, Name, Type
 
-### Feedback Forms
+### Members (V2 only)
 ` + "```bash" + `
-pboard feedback-forms list               # List feedback forms
-pboard feedback-forms get <id>           # Get single feedback form
+pboard members list [flags]              # List workspace members
+pboard members get <id>                  # Get single member
+` + "```" + `
+**List flags:** ` + "`--role`" + ` (admin/maker/viewer/contributor), ` + "`--query`" + `
+**List columns:** ID, Name, Email, Role
+
+### Teams (V2 only)
+` + "```bash" + `
+pboard teams list [flags]                # List teams
+pboard teams get <id>                    # Get single team
+` + "```" + `
+**List flags:** ` + "`--query`" + `
+**List columns:** ID, Name, Handle, Description
+
+### Feedback Forms (V1 only)
+` + "```bash" + `
+pboard feedback-forms list --api-version 1    # List feedback forms
+pboard feedback-forms get <id> --api-version 1
 ` + "```" + `
 **List columns:** ID, Name
+> **Note:** Feedback forms are not available with API V2. Use ` + "`--api-version 1`" + `.
 
 ### Webhooks
 ` + "```bash" + `
