@@ -14,17 +14,18 @@ var (
 	// Version is set at build time by GoReleaser.
 	Version = "dev"
 
-	outputFormat  string
-	limitFlag     int
+	outputFormat   string
+	limitFlag      int
 	apiVersionFlag string
+	allowWriteFlag bool
 )
 
 // NewRootCmd creates the root command.
 func NewRootCmd() *cobra.Command {
 	rootCmd := &cobra.Command{
-		Use:   "pboard",
-		Short: "ProductBoard CLI - read-only access to ProductBoard API",
-		Long:  "pboard is a command-line tool for browsing ProductBoard data.\nIt provides read-only access to features, products, notes, releases, and more.\n\nSupports both API V1 and V2 (default). Use --api-version to switch.",
+		Use:     "pboard",
+		Short:   "ProductBoard CLI - read-only by default, with gated writes",
+		Long:    "pboard is a command-line tool for browsing ProductBoard data.\nIt provides read access to features, products, notes, releases, and more.\n\nWrites (create/update of entities and notes, API V2 only) are disabled by default.\nEnable them with --allow-write, `pboard configure --write-enabled`, or PRODUCTBOARD_WRITE_ENABLED=1.\n\nSupports both API V1 and V2 (default). Use --api-version to switch.",
 		Version: Version,
 	}
 
@@ -32,12 +33,15 @@ func NewRootCmd() *cobra.Command {
 	rootCmd.PersistentFlags().IntVarP(&limitFlag, "limit", "l", 0, "Maximum number of results (0 = all)")
 	rootCmd.PersistentFlags().StringVar(&apiVersionFlag, "api-version", "", "API version to use: 1 or 2 (empty = use config/env; default 2)")
 
+	rootCmd.PersistentFlags().BoolVar(&allowWriteFlag, "allow-write", false, "Enable write operations for this run (create/update; API V2 only)")
+
 	// Register all subcommands
 	rootCmd.AddCommand(newConfigureCmd())
 	rootCmd.AddCommand(newFeaturesCmd())
 	rootCmd.AddCommand(newProductsCmd())
 	rootCmd.AddCommand(newComponentsCmd())
 	rootCmd.AddCommand(newFeatureStatusesCmd())
+	rootCmd.AddCommand(newEntitiesCmd())
 	rootCmd.AddCommand(newNotesCmd())
 	rootCmd.AddCommand(newFeedbackFormsCmd())
 	rootCmd.AddCommand(newCompaniesCmd())
@@ -77,6 +81,8 @@ func getClient() (*client.Client, error) {
 	if apiVersionFlag != "" {
 		cfg.APIVersion = apiVersionFlag
 	}
+	// --allow-write can only turn the gate on for this run
+	cfg.WriteEnabled = cfg.WriteEnabled || allowWriteFlag
 	return client.New(cfg)
 }
 

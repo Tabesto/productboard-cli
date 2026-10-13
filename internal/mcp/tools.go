@@ -5,7 +5,11 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-func registerTools(s *server.MCPServer) {
+func registerTools(s *server.MCPServer, allowWrite bool) {
+	if allowWrite {
+		registerWriteTools(s)
+	}
+
 	// --- Features ---
 	s.AddTool(mcp.NewTool("list_features",
 		mcp.WithDescription("List ProductBoard features with optional filters"),

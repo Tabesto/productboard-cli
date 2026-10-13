@@ -1,6 +1,6 @@
 # productboard-cli Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-04-01
+Auto-generated from all feature plans. Last updated: 2026-10-13
 
 ## Active Technologies
 - Go 1.22+ (existing project) + Cobra (existing), no new dependencies (002-configure-token-arg)
@@ -11,6 +11,8 @@ Auto-generated from all feature plans. Last updated: 2026-04-01
 - N/A (reads from ProductBoard API via existing client) (004-feature-health-helper)
 - Go 1.26.1 (go.mod) + Cobra (CLI), Viper (config), go-pretty/v6 (tables), mcp-go (MCP server) — no new dependencies (005-v2-api-migration)
 - Config file at `~/.config/pboard/config.yaml` (mode 600) (005-v2-api-migration)
+- Go 1.26.1 (go.mod) + Cobra, Viper, go-pretty/v6, mcp-go v0.46.0 — all existing, no new dependencies (006-gated-write-support)
+- `~/.config/pboard/config.yaml` (mode 600), new key `write_enabled` (006-gated-write-support)
 
 - Go 1.22+ + Cobra (CLI framework), tablewriter (table output), viper (config management) (001-productboard-cli-read)
 
@@ -30,9 +32,9 @@ tests/
 Go 1.22+: Follow standard conventions
 
 ## Recent Changes
+- 006-gated-write-support: Added Go 1.26.1 (go.mod) + Cobra, Viper, go-pretty/v6, mcp-go v0.46.0 — all existing, no new dependencies
 - 005-v2-api-migration: Added Go 1.26.1 (go.mod) + Cobra (CLI), Viper (config), go-pretty/v6 (tables), mcp-go (MCP server) — no new dependencies
 - 004-feature-health-helper: Added Go 1.26.1 + Cobra (CLI), go-pretty (tables), mcp-go (MCP server), Viper (config) -- all existing, no new dependencies
-- 003-pboard-mcp-server: Added Go 1.22+ (existing project, go.mod shows 1.26.1) + Cobra (CLI), mcp-go (MCP server), viper (config), go-pretty (output)
 
 
 <!-- MANUAL ADDITIONS START -->

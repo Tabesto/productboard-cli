@@ -17,6 +17,99 @@ func newNotesCmd() *cobra.Command {
 	cmd.AddCommand(newNotesGetCmd())
 	cmd.AddCommand(newNotesTagsCmd())
 	cmd.AddCommand(newNotesLinksCmd())
+	cmd.AddCommand(newNotesCreateCmd())
+	cmd.AddCommand(newNotesUpdateCmd())
+
+	return cmd
+}
+
+func newNotesCreateCmd() *cobra.Command {
+	var (
+		typ     string
+		name    string
+		content string
+		fields  []string
+		raw     string
+	)
+
+	cmd := &cobra.Command{
+		Use:     "create",
+		Short:   "Create a note (requires write access)",
+		Example: `  pboard --allow-write notes create --name "Customer asked for X" --content "Details"`,
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := getClient()
+			if err != nil {
+				handleError(err)
+				return nil
+			}
+			if err := c.RequireWrite(); err != nil {
+				handleError(err)
+				return nil
+			}
+			body, err := buildNoteCreateBody(typ, name, content, fields, raw)
+			if err != nil {
+				handleError(err)
+				return nil
+			}
+			resp, err := c.Post("/notes", body)
+			if err != nil {
+				handleError(err)
+				return nil
+			}
+			return printWriteResult(resp)
+		},
+	}
+
+	cmd.Flags().StringVar(&typ, "type", "textNote", "Note type: textNote or conversationNote")
+	cmd.Flags().StringVar(&name, "name", "", "Note name (shortcut for --field name=...)")
+	cmd.Flags().StringVar(&content, "content", "", "Note content (shortcut for --field content=...)")
+	cmd.Flags().StringArrayVar(&fields, "field", nil, "Field value as key=value (repeatable; value read as JSON when valid)")
+	cmd.Flags().StringVar(&raw, "json", "", "Full request \"data\" object as JSON (advanced)")
+
+	return cmd
+}
+
+func newNotesUpdateCmd() *cobra.Command {
+	var (
+		fields []string
+		patch  string
+		raw    string
+	)
+
+	cmd := &cobra.Command{
+		Use:     "update <id>",
+		Short:   "Update a note (requires write access)",
+		Long:    "Update a note. Provide exactly one of --field (replace values), --patch (set/addItems/removeItems/clear operations) or --json.",
+		Example: `  pboard --allow-write notes update <id> --field content="Edited"`,
+		Args:    cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			c, err := getClient()
+			if err != nil {
+				handleError(err)
+				return nil
+			}
+			if err := c.RequireWrite(); err != nil {
+				handleError(err)
+				return nil
+			}
+			body, err := buildUpdateBody(fields, patch, raw)
+			if err != nil {
+				handleError(err)
+				return nil
+			}
+			resp, err := c.Patch("/notes/"+args[0], body)
+			if err != nil {
+				handleError(err)
+				return nil
+			}
+			return printWriteResult(resp)
+		},
+	}
+
+	cmd.Flags().StringArrayVar(&fields, "field", nil, "Field value as key=value (repeatable)")
+	cmd.Flags().StringVar(&patch, "patch", "", "JSON array of patch operations")
+	cmd.Flags().StringVar(&raw, "json", "", "Full request \"data\" object as JSON (advanced)")
 
 	return cmd
 }

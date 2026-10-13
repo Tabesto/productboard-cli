@@ -7,12 +7,13 @@ import (
 
 // Exit codes for CLI error types.
 const (
-	ExitSuccess      = 0
-	ExitGeneralError = 1
-	ExitAuthError    = 2
-	ExitNotFound     = 3
-	ExitRateLimited  = 4
-	ExitInvalidInput = 5
+	ExitSuccess       = 0
+	ExitGeneralError  = 1
+	ExitAuthError     = 2
+	ExitNotFound      = 3
+	ExitRateLimited   = 4
+	ExitInvalidInput  = 5
+	ExitWriteDisabled = 6
 )
 
 // APIError represents an error from the ProductBoard API.
@@ -104,6 +105,15 @@ func extractV2ErrorDetail(body string) string {
 		return v2Err.Errors[0].Detail
 	}
 	return v2Err.Errors[0].Title
+}
+
+// NewWriteDisabledError is returned when a write is attempted while the write gate is off.
+func NewWriteDisabledError() *APIError {
+	return &APIError{
+		StatusCode: 0,
+		Message:    "write operations are disabled. Enable with --allow-write, `pboard configure --write-enabled`, or PRODUCTBOARD_WRITE_ENABLED=1.",
+		ExitCode:   ExitWriteDisabled,
+	}
 }
 
 // NewNetworkError creates a network error.

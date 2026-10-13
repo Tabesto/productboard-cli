@@ -1,12 +1,14 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/tabesto/productboard-cli/internal/config"
 )
@@ -17,6 +19,7 @@ type Client struct {
 	baseURL    string
 	token      string
 	apiVersion string
+	allowWrite bool
 }
 
 // New creates a new ProductBoard API client from config.
@@ -42,10 +45,11 @@ func New(cfg *config.Config) (*Client, error) {
 	}
 
 	return &Client{
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: 30 * time.Second},
 		baseURL:    strings.TrimRight(cfg.BaseURL, "/"),
 		token:      cfg.APIToken,
 		apiVersion: cfg.APIVersion,
+		allowWrite: cfg.WriteEnabled,
 	}, nil
 }
 
@@ -64,6 +68,53 @@ func (c *Client) Get(path string, params map[string]string) ([]byte, error) {
 		}
 		for k, v := range extraParams {
 			actualParams[k] = v
+		}
+	}
+
+	return c.do("GET", actualPath, actualParams, nil)
+}
+
+// RequireWrite returns an error unless the write gate is on and the client uses API V2.
+func (c *Client) RequireWrite() error {
+	if !c.allowWrite {
+		return NewWriteDisabledError()
+	}
+	if !c.IsV2() {
+		return &APIError{
+			Message:  "write operations require API version 2.",
+			ExitCode: ExitInvalidInput,
+		}
+	}
+	return nil
+}
+
+// Post sends a JSON POST to a V2 path (without the /v2 prefix) and returns the response body.
+func (c *Client) Post(path string, body any) ([]byte, error) {
+	return c.write("POST", path, body)
+}
+
+// Patch sends a JSON PATCH to a V2 path (without the /v2 prefix) and returns the response body.
+func (c *Client) Patch(path string, body any) ([]byte, error) {
+	return c.write("PATCH", path, body)
+}
+
+func (c *Client) write(method, path string, body any) ([]byte, error) {
+	if err := c.RequireWrite(); err != nil {
+		return nil, err
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode request body: %w", err)
+	}
+	return c.do(method, "/v2"+path, nil, payload)
+}
+
+// do sends a request and returns the raw response body. Every non-GET request
+// passes through the write gate here, so no write path can bypass it.
+func (c *Client) do(method, actualPath string, actualParams map[string]string, payload []byte) ([]byte, error) {
+	if method != "GET" {
+		if err := c.RequireWrite(); err != nil {
+			return nil, err
 		}
 	}
 
@@ -89,13 +140,20 @@ func (c *Client) Get(path string, params map[string]string) ([]byte, error) {
 		}
 	}
 
-	req, err := http.NewRequest("GET", reqURL, nil)
+	var reqBody io.Reader
+	if payload != nil {
+		reqBody = bytes.NewReader(payload)
+	}
+	req, err := http.NewRequest(method, reqURL, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	if c.apiVersion != "2" {
 		req.Header.Set("X-Version", "1")
 	}
