@@ -70,6 +70,13 @@ func TestBuildEntityCreateBody(t *testing.T) {
 	if _, err := buildEntityCreateBody("", nil, `{"type":"feature"}`); err != nil {
 		t.Errorf("type in json: %v", err)
 	}
+	body, err = buildEntityCreateBody("", []string{"b=2"}, `{"type":"feature","fields":{"a":1}}`)
+	if err != nil || marshal(t, body) != `{"data":{"fields":{"a":1,"b":2},"type":"feature"}}` {
+		t.Errorf("json+field merge: %s %v", marshal(t, body), err)
+	}
+	if _, err := buildEntityCreateBody("", nil, `{"type":"feature","fields":[1]}`); err == nil {
+		t.Error("non-object fields: want error")
+	}
 }
 
 func TestBuildNoteCreateBody(t *testing.T) {
@@ -83,5 +90,20 @@ func TestBuildNoteCreateBody(t *testing.T) {
 	}
 	if _, err := buildNoteCreateBody("textNote", "", "", []string{"name=viaField"}, ""); err != nil {
 		t.Errorf("name via --field: %v", err)
+	}
+
+	// raw --json must enforce the name and honour --name/--content/--field
+	for _, raw := range []string{`{"type":"textNote","fields":{}}`, `{"type":"textNote"}`, `{"fields":{"name":""}}`} {
+		if _, err := buildNoteCreateBody("textNote", "", "", nil, raw); err == nil {
+			t.Errorf("raw %s without name: want error", raw)
+		}
+	}
+	body, err = buildNoteCreateBody("textNote", "N", "C", []string{"x=1"}, `{"fields":{"x":0,"y":2}}`)
+	want = `{"data":{"fields":{"content":"C","name":"N","x":1,"y":2},"type":"textNote"}}`
+	if err != nil || marshal(t, body) != want {
+		t.Errorf("raw merge: %s %v", marshal(t, body), err)
+	}
+	if _, err := buildNoteCreateBody("textNote", "", "", nil, `{"fields":{"name":"ok"}}`); err != nil {
+		t.Errorf("raw with name: %v", err)
 	}
 }

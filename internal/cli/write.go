@@ -74,58 +74,81 @@ func buildUpdateBody(fieldPairs []string, patch, rawJSON string) (map[string]any
 	}
 }
 
+// mergeFields merges --field pairs into data["fields"] (flags win over --json values).
+func mergeFields(data map[string]any, extra map[string]any) (map[string]any, error) {
+	fields := map[string]any{}
+	if raw, ok := data["fields"]; ok && raw != nil {
+		m, ok := raw.(map[string]any)
+		if !ok {
+			return nil, invalidInput("invalid --json: \"fields\" must be an object")
+		}
+		fields = m
+	}
+	for k, v := range extra {
+		fields[k] = v
+	}
+	data["fields"] = fields
+	return fields, nil
+}
+
 // buildEntityCreateBody builds {"data": {"type", "fields"}} for an entity create.
+// With --json, --type and --field are merged into the raw data object.
 func buildEntityCreateBody(typ string, fieldPairs []string, rawJSON string) (map[string]any, error) {
+	data := map[string]any{}
 	if rawJSON != "" {
-		data, err := parseRawData(rawJSON)
-		if err != nil {
+		var err error
+		if data, err = parseRawData(rawJSON); err != nil {
 			return nil, err
 		}
-		if typ != "" {
-			data["type"] = typ
-		}
-		if data["type"] == nil {
-			return nil, invalidInput("--type is required")
-		}
-		return map[string]any{"data": data}, nil
 	}
-	if typ == "" {
+	if typ != "" {
+		data["type"] = typ
+	}
+	if data["type"] == nil {
 		return nil, invalidInput("--type is required")
 	}
-	fields, err := parseFieldPairs(fieldPairs)
+	extra, err := parseFieldPairs(fieldPairs)
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"data": map[string]any{"type": typ, "fields": fields}}, nil
+	if _, err := mergeFields(data, extra); err != nil {
+		return nil, err
+	}
+	return map[string]any{"data": data}, nil
 }
 
 // buildNoteCreateBody builds {"data": {"type", "fields"}} for a note create.
-// --name and --content are shortcuts for fields.name and fields.content.
+// --name and --content are shortcuts for fields.name and fields.content, and are
+// merged into a raw --json object too. A non-empty name is always required locally.
 func buildNoteCreateBody(typ, name, content string, fieldPairs []string, rawJSON string) (map[string]any, error) {
+	data := map[string]any{}
 	if rawJSON != "" {
-		data, err := parseRawData(rawJSON)
-		if err != nil {
+		var err error
+		if data, err = parseRawData(rawJSON); err != nil {
 			return nil, err
 		}
-		if data["type"] == nil {
-			data["type"] = typ
-		}
-		return map[string]any{"data": data}, nil
 	}
-	fields, err := parseFieldPairs(fieldPairs)
+	if data["type"] == nil {
+		data["type"] = typ
+	}
+	extra, err := parseFieldPairs(fieldPairs)
 	if err != nil {
 		return nil, err
 	}
 	if name != "" {
-		fields["name"] = name
+		extra["name"] = name
 	}
 	if content != "" {
-		fields["content"] = content
+		extra["content"] = content
 	}
-	if fields["name"] == nil {
-		return nil, invalidInput("note name is required (--name or --field name=...)")
+	fields, err := mergeFields(data, extra)
+	if err != nil {
+		return nil, err
 	}
-	return map[string]any{"data": map[string]any{"type": typ, "fields": fields}}, nil
+	if n, _ := fields["name"].(string); n == "" {
+		return nil, invalidInput("note name is required (--name, --field name=..., or fields.name in --json)")
+	}
+	return map[string]any{"data": data}, nil
 }
 
 // printWriteResult prints the minimal reference returned by a create/update.

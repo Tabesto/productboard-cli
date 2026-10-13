@@ -28,7 +28,7 @@ pboard entities update <id> (--field key=value... | --patch '<json array>' | --j
 ```
 pboard notes create --name <name> [--type textNote|conversationNote] [--content <text>] [--field key=value]... [--json '<data object>']
 ```
-- `--type` default `textNote`. `--name`/`--content` are shortcuts for `fields.name`/`fields.content`. Sends `POST /v2/notes`.
+- `--type` default `textNote`. `--name`/`--content`/`--field` are shortcuts for `fields.*` and are merged into a `--json` object too (flags win). A non-empty `fields.name` is always required locally (exit 5). Sends `POST /v2/notes`.
 
 ### `pboard notes update <id>`
 Same rule as entities update. Sends `PATCH /v2/notes/<id>`.
