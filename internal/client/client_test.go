@@ -222,3 +222,30 @@ func TestWriteAbortsWhenAuditLogUnwritable(t *testing.T) {
 		t.Errorf("request sent although audit log was unwritable (%d hits)", hits)
 	}
 }
+
+func TestFeatureStatusesV2(t *testing.T) {
+	var path string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		_, _ = w.Write([]byte(`{"data":{"type":"feature","fields":{"status":{"id":"s","values":{"data":[
+			{"id":"1","name":"Backlog","assignedEntityTypes":["feature"]},
+			{"id":"2","name":"Beta","assignedEntityTypes":["feature"]},
+			{"id":"3","name":"Done","assignedEntityTypes":["feature"]}]}}}}}`))
+	}))
+	defer srv.Close()
+	c := newTestClient(t, srv, "2", false)
+
+	got, err := c.GetList("/feature-statuses", nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != "/v2/entities/configurations/feature" {
+		t.Errorf("path = %s", path)
+	}
+	if len(got) != 3 || got[1]["id"] != "2" || got[1]["name"] != "Beta" {
+		t.Errorf("got %v", got)
+	}
+	if got, _ = c.GetList("/feature-statuses", nil, 2); len(got) != 2 {
+		t.Errorf("limit 2: got %d", len(got))
+	}
+}

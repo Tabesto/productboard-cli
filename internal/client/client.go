@@ -244,6 +244,10 @@ func (c *Client) GetSingleWithParams(path string, params map[string]string) (map
 // GetList fetches a paginated list of resources with auto-pagination.
 // It follows pageCursor until exhausted or limit is reached.
 func (c *Client) GetList(path string, params map[string]string, limit int) ([]map[string]interface{}, error) {
+	if c.apiVersion == "2" && path == "/feature-statuses" {
+		return c.getFeatureStatuses(limit)
+	}
+
 	var allResults []map[string]interface{}
 
 	if params == nil {
