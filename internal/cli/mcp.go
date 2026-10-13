@@ -35,15 +35,17 @@ func newMcpCmd() *cobra.Command {
 }
 
 func newMcpServeCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start the MCP server (stdio transport)",
-		Long:  "Starts the pboard MCP server using stdio transport. This is called by Claude Desktop, not typically run directly.",
+		Long:  "Starts the pboard MCP server using stdio transport. This is called by Claude Desktop, not typically run directly.\n\nWrite tools (create/update entities and notes) are registered only when writes are enabled (--allow-write, write_enabled in config, or PRODUCTBOARD_WRITE_ENABLED).",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			pbmcp.Version = Version
-			return pbmcp.Serve()
+			return pbmcp.Serve(allowWriteFlag)
 		},
 	}
+
+	return cmd
 }
 
 func newMcpInstallCmd() *cobra.Command {
@@ -71,9 +73,13 @@ func newMcpInstallCmd() *cobra.Command {
 				return fmt.Errorf("failed to resolve pboard binary path: %w", err)
 			}
 
+			serveArgs := []string{"mcp", "serve"}
+			if allowWriteFlag { // persistent --allow-write
+				serveArgs = append(serveArgs, "--allow-write")
+			}
 			entry := map[string]interface{}{
 				"command": execPath,
-				"args":    []string{"mcp", "serve"},
+				"args":    serveArgs,
 			}
 
 			if dryRun {

@@ -17,6 +17,7 @@ func getClient() (*client.Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
+	cfg.WriteEnabled = cfg.WriteEnabled || writeEnabled
 	return client.New(cfg)
 }
 

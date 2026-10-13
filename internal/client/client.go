@@ -1,12 +1,14 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/tabesto/productboard-cli/internal/config"
 )
@@ -17,6 +19,8 @@ type Client struct {
 	baseURL    string
 	token      string
 	apiVersion string
+	allowWrite bool
+	auditPath  string
 }
 
 // New creates a new ProductBoard API client from config.
@@ -41,11 +45,18 @@ func New(cfg *config.Config) (*Client, error) {
 		}
 	}
 
+	auditPath, err := config.AuditLogPath()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Client{
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: 30 * time.Second},
 		baseURL:    strings.TrimRight(cfg.BaseURL, "/"),
 		token:      cfg.APIToken,
 		apiVersion: cfg.APIVersion,
+		allowWrite: cfg.WriteEnabled,
+		auditPath:  auditPath,
 	}, nil
 }
 
@@ -64,6 +75,80 @@ func (c *Client) Get(path string, params map[string]string) ([]byte, error) {
 		}
 		for k, v := range extraParams {
 			actualParams[k] = v
+		}
+	}
+
+	return c.do("GET", actualPath, actualParams, nil)
+}
+
+// RequireWrite returns an error unless the write gate is on and the client uses API V2.
+func (c *Client) RequireWrite() error {
+	if !c.allowWrite {
+		return NewWriteDisabledError()
+	}
+	if !c.IsV2() {
+		return &APIError{
+			Message:  "write operations require API version 2.",
+			ExitCode: ExitInvalidInput,
+		}
+	}
+	return nil
+}
+
+// Post sends a JSON POST to a V2 path (without the /v2 prefix) and returns the response body.
+func (c *Client) Post(path string, body any) ([]byte, error) {
+	return c.write("POST", path, body)
+}
+
+// Patch sends a JSON PATCH to a V2 path (without the /v2 prefix) and returns the response body.
+func (c *Client) Patch(path string, body any) ([]byte, error) {
+	return c.write("PATCH", path, body)
+}
+
+func (c *Client) write(method, path string, body any) ([]byte, error) {
+	if err := c.RequireWrite(); err != nil {
+		return nil, err
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode request body: %w", err)
+	}
+
+	// Audit: log the intent (with the pre-update snapshot) before sending, and fail
+	// closed so that no write happens without a record that allows a revert.
+	entry := auditEntry{OpID: newOpID(), Event: "request", Method: method, Path: "/v2" + path, Body: body}
+	if method == "PATCH" {
+		prev, revert, err := c.snapshot(path, body)
+		if err != nil {
+			if apiErr, ok := err.(*APIError); ok {
+				return nil, apiErr
+			}
+			return nil, fmt.Errorf("update aborted: cannot read current value for the audit log: %w", err)
+		}
+		entry.Previous, entry.Revert = prev, revert
+	}
+	if err := c.appendAudit(entry); err != nil {
+		return nil, fmt.Errorf("write aborted: cannot write audit log %s: %w", c.auditPath, err)
+	}
+
+	resp, err := c.do(method, "/v2"+path, nil, payload)
+
+	result := auditEntry{OpID: entry.OpID, Event: "response"}
+	if err != nil {
+		result.Error = err.Error()
+	} else if ref, perr := ParseWriteRef(resp); perr == nil {
+		result.Result = ref
+	}
+	_ = c.appendAudit(result) // best effort: the request line already allows a revert
+	return resp, err
+}
+
+// do sends a request and returns the raw response body. Every non-GET request
+// passes through the write gate here, so no write path can bypass it.
+func (c *Client) do(method, actualPath string, actualParams map[string]string, payload []byte) ([]byte, error) {
+	if method != "GET" {
+		if err := c.RequireWrite(); err != nil {
+			return nil, err
 		}
 	}
 
@@ -89,13 +174,20 @@ func (c *Client) Get(path string, params map[string]string) ([]byte, error) {
 		}
 	}
 
-	req, err := http.NewRequest("GET", reqURL, nil)
+	var reqBody io.Reader
+	if payload != nil {
+		reqBody = bytes.NewReader(payload)
+	}
+	req, err := http.NewRequest(method, reqURL, reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json")
+	if payload != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	if c.apiVersion != "2" {
 		req.Header.Set("X-Version", "1")
 	}
@@ -152,6 +244,10 @@ func (c *Client) GetSingleWithParams(path string, params map[string]string) (map
 // GetList fetches a paginated list of resources with auto-pagination.
 // It follows pageCursor until exhausted or limit is reached.
 func (c *Client) GetList(path string, params map[string]string, limit int) ([]map[string]interface{}, error) {
+	if c.apiVersion == "2" && path == "/feature-statuses" {
+		return c.getFeatureStatuses(limit)
+	}
+
 	var allResults []map[string]interface{}
 
 	if params == nil {

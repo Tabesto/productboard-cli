@@ -6,7 +6,7 @@ description: Guide for using the pboard CLI to query ProductBoard data. Use when
 
 # ProductBoard CLI (pboard) — Agent Usage Guide
 
-You have access to ` + "`pboard`" + `, a **read-only** CLI for browsing ProductBoard data. It cannot create, update, or delete anything.
+You have access to ` + "`pboard`" + `, a CLI for browsing ProductBoard data. It is **read-only by default**; it can never delete anything.
 
 ## Setup
 
@@ -200,6 +200,22 @@ pboard plugin-integrations get <id>
 pboard plugin-integrations connections list <id>
 pboard plugin-integrations connections get <id> <featureId>
 ` + "```" + `
+
+## Write Access (disabled by default)
+
+` + "`entities create|update`" + ` and ` + "`notes create|update`" + ` change real ProductBoard data (API V2 only). They fail with exit code 6 unless the user has enabled writes (` + "`--allow-write`" + `, ` + "`pboard configure --write-enabled`" + `, or ` + "`PRODUCTBOARD_WRITE_ENABLED=1`" + `).
+
+**Never enable writes on your own.** If a write is refused, tell the user and let them decide. Before writing, read an existing record of the same type (` + "`-o json`" + `) to learn the workspace's field names, and confirm intent with the user.
+
+` + "```bash" + `
+pboard --allow-write entities create --type feature --field name="My feature"
+pboard --allow-write entities update <id> --field name="Renamed"
+pboard --allow-write entities update <id> --patch '[{"op":"clear","path":"owner"}]'
+pboard --allow-write notes create --name "Title" --content "Text"
+pboard --allow-write notes update <id> --field content="Edited"
+` + "```" + `
+
+Updates take exactly one of ` + "`--field k=v`" + ` (repeatable), ` + "`--patch '<json array>'`" + ` or ` + "`--json '<data object>'`" + `. Output is only the id, type and link of the record; use ` + "`get`" + ` for details.
 
 ## Agent Best Practices
 

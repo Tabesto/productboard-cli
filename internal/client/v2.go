@@ -1,6 +1,8 @@
 package client
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
@@ -232,4 +234,33 @@ func extractPageCursorFromURL(nextURL string) string {
 		return ""
 	}
 	return u.Query().Get("pageCursor")
+}
+
+// getFeatureStatuses lists feature statuses in V2. The V2 endpoint returns the
+// feature type's configuration (an object), not a list: the statuses are
+// the options of the "status" field, at data.fields.status.values.data.
+func (c *Client) getFeatureStatuses(limit int) ([]map[string]interface{}, error) {
+	body, err := c.Get("/feature-statuses", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp struct {
+		Data struct {
+			Fields struct {
+				Status struct {
+					Values struct {
+						Data []map[string]interface{} `json:"data"`
+					} `json:"values"`
+				} `json:"status"`
+			} `json:"fields"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+	statuses := resp.Data.Fields.Status.Values.Data
+	if limit > 0 && len(statuses) > limit {
+		statuses = statuses[:limit]
+	}
+	return statuses, nil
 }
