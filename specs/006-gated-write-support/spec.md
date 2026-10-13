@@ -121,6 +121,7 @@ A user who writes regularly stores the choice in their configuration instead of 
 - **FR-016**: All existing read commands and read tools MUST keep their current behavior.
 - **FR-017**: Documentation (README, embedded agent skill, and project constitution's read-only principle) MUST describe read-only-by-default with gated writes.
 - **FR-018**: Deleting data, managing relationships, field-value option management and V1 writes MUST remain out of scope and unavailable.
+- **FR-019**: System MUST append every write to a local audit log before sending it (with the record's pre-update value and a ready-to-send revert body for updated fields), record the outcome afterwards, and MUST NOT send the write if the log cannot be written or the current value cannot be read.
 
 ### Key Entities
 
@@ -139,6 +140,7 @@ A user who writes regularly stores the choice in their configuration instead of 
 - **SC-004**: An AI assistant connected without write enabled sees 0 write tools; with it enabled, sees exactly the 4 documented write tools.
 - **SC-005**: Re-running configure to change only the token leaves 100% of other saved settings unchanged.
 - **SC-006**: Every pre-existing read command and read tool produces unchanged results after the feature ships.
+- **SC-007**: For 100% of updates, the audit log holds enough information to restore the replaced field values without consulting Productboard history.
 
 ## Assumptions
 

@@ -110,3 +110,12 @@ func Update(values map[string]any) error {
 	}
 	return os.Chmod(filePath, 0600)
 }
+
+// AuditLogPath returns the path of the write audit log (next to the config file).
+func AuditLogPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("cannot determine home directory: %w", err)
+	}
+	return filepath.Join(home, ConfigDir, "audit.log"), nil
+}

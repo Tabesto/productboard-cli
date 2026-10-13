@@ -165,6 +165,21 @@ pboard --allow-write notes update <id> --field content="Edited"
 
 `--field key=value` is repeatable (the value is read as JSON when valid, otherwise as text). `--json '<data object>'` sends a full request `data` object. An update takes exactly one of `--field`, `--patch` or `--json`. Create/update print only the new record's id, type and link; use the usual `get` commands for the full record. Deleting and relationship management are not supported.
 
+### Audit log and reverting
+
+Every write (CLI and MCP) is recorded in `~/.config/pboard/audit.log` (mode 600, one JSON object per line, append-only, never rotated). Each write has a `request` line written **before** the call and a `response` line (same `op_id`) with the returned id/link or the error. For updates, the `request` line also holds `previous`, the record as read just before the change, and `revert`, a request body that puts back the previous value of each field that was replaced.
+
+The log is fail-closed: if the log cannot be written, or the current value cannot be read before an update, the write is not sent. Note contents sent on create/update end up in the log, so treat the file as sensitive.
+
+```bash
+# list recent updates (op_id, target, revert body)
+jq -c 'select(.event=="request" and .method=="PATCH") | {op_id, path, revert}' ~/.config/pboard/audit.log | tail -5
+# undo one (check the body first: it is built from the read format and has not been verified against the real API)
+pboard --allow-write entities update <id> --json "$(jq -c 'select(.op_id=="<op_id>" and .event=="request") | .revert.data' ~/.config/pboard/audit.log)"
+```
+
+Limits: a field that did not exist before an update is not in `revert` (clear it by hand); updates made with `--patch` keep the full `previous` snapshot but no ready-made `revert`; a create cannot be undone by pboard (delete the record in Productboard using the id in the `response` line).
+
 ## MCP Server for Claude Desktop
 
 Use ProductBoard data directly from Claude Desktop as MCP tools. One command to install:

@@ -1,10 +1,14 @@
 package client
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -17,6 +21,7 @@ func newTestClient(t *testing.T, srv *httptest.Server, version string, write boo
 	if err != nil {
 		t.Fatal(err)
 	}
+	c.auditPath = filepath.Join(t.TempDir(), "audit.log") // never touch the real audit log
 	return c
 }
 
@@ -101,5 +106,119 @@ func TestGetWorksWithoutGate(t *testing.T) {
 	c := newTestClient(t, srv, "2", false)
 	if _, err := c.Get("/notes", nil); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func readAudit(t *testing.T, c *Client) []map[string]any {
+	t.Helper()
+	data, err := os.ReadFile(c.auditPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []map[string]any
+	for _, line := range strings.Split(strings.TrimSpace(string(data)), "\n") {
+		var m map[string]any
+		if err := json.Unmarshal([]byte(line), &m); err != nil {
+			t.Fatalf("bad audit line %q: %v", line, err)
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+func TestUpdateIsAuditedWithRevertBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			_, _ = w.Write([]byte(`{"data":{"id":"abc","type":"feature","fields":{"name":"Old","status":"x"}}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"data":{"id":"abc","type":"feature","links":{"self":"u"}}}`))
+	}))
+	defer srv.Close()
+	c := newTestClient(t, srv, "2", true)
+
+	body := map[string]any{"data": map[string]any{"fields": map[string]any{"name": "New", "owner": "z"}}}
+	if _, err := c.Patch("/entities/abc", body); err != nil {
+		t.Fatal(err)
+	}
+	log := readAudit(t, c)
+	if len(log) != 2 || log[0]["event"] != "request" || log[1]["event"] != "response" || log[0]["op_id"] != log[1]["op_id"] {
+		t.Fatalf("log = %v", log)
+	}
+	if log[0]["method"] != "PATCH" || log[0]["path"] != "/v2/entities/abc" {
+		t.Errorf("request line = %v", log[0])
+	}
+	// revert restores only touched fields that existed before ("owner" did not)
+	rev, _ := json.Marshal(log[0]["revert"])
+	if string(rev) != `{"data":{"fields":{"name":"Old"}}}` {
+		t.Errorf("revert = %s", rev)
+	}
+	if prev, _ := json.Marshal(log[0]["previous"]); !strings.Contains(string(prev), `"status":"x"`) {
+		t.Errorf("previous snapshot missing: %s", prev)
+	}
+	if res, _ := log[1]["result"].(map[string]any); res["id"] != "abc" {
+		t.Errorf("response line = %v", log[1])
+	}
+	if fi, _ := os.Stat(c.auditPath); fi.Mode().Perm() != 0600 {
+		t.Errorf("audit mode = %v", fi.Mode().Perm())
+	}
+}
+
+func TestCreateIsAuditedWithoutSnapshot(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			t.Errorf("unexpected %s", r.Method)
+		}
+		_, _ = w.Write([]byte(`{"data":{"id":"n1","type":"textNote","links":{"self":"u"}}}`))
+	}))
+	defer srv.Close()
+	c := newTestClient(t, srv, "2", true)
+	if _, err := c.Post("/notes", map[string]any{"data": map[string]any{"type": "textNote"}}); err != nil {
+		t.Fatal(err)
+	}
+	log := readAudit(t, c)
+	if len(log) != 2 || log[0]["previous"] != nil {
+		t.Fatalf("log = %v", log)
+	}
+	if res, _ := log[1]["result"].(map[string]any); res["id"] != "n1" {
+		t.Errorf("response line = %v", log[1])
+	}
+}
+
+func TestUpdateAbortsWhenSnapshotFails(t *testing.T) {
+	var patches int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "PATCH" {
+			atomic.AddInt32(&patches, 1)
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+	c := newTestClient(t, srv, "2", true)
+	if _, err := c.Patch("/entities/missing", map[string]any{"data": map[string]any{}}); err == nil {
+		t.Fatal("want error")
+	}
+	if patches != 0 {
+		t.Error("PATCH sent although the snapshot failed")
+	}
+}
+
+func TestWriteAbortsWhenAuditLogUnwritable(t *testing.T) {
+	var hits int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt32(&hits, 1)
+	}))
+	defer srv.Close()
+	c := newTestClient(t, srv, "2", true)
+	blocker := filepath.Join(t.TempDir(), "file")
+	if err := os.WriteFile(blocker, nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	c.auditPath = filepath.Join(blocker, "audit.log") // parent is a regular file
+	if _, err := c.Post("/entities", map[string]any{"data": 1}); err == nil {
+		t.Fatal("want error")
+	}
+	if hits != 0 {
+		t.Errorf("request sent although audit log was unwritable (%d hits)", hits)
 	}
 }

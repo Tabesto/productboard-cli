@@ -59,3 +59,12 @@ Descriptions MUST tell the agent to read `/entities/configurations` / `/notes/co
 | Call | Headers |
 |------|---------|
 | `POST {base}/v2/entities`, `PATCH {base}/v2/entities/{id}`, `POST {base}/v2/notes`, `PATCH {base}/v2/notes/{id}` | `Authorization: Bearer <token>`, `Accept: application/json`, `Content-Type: application/json`; **no** `X-Version` |
+
+## Audit log (`~/.config/pboard/audit.log`, mode 600, JSONL, fail-closed)
+
+| Line | Fields |
+|------|--------|
+| `request` (before the call) | `time`, `op_id`, `event`, `method`, `path`, `body`; for PATCH also `previous` (record `data` read just before) and `revert` (`{"data":{"fields":{<touched fields that existed>}}}`, only for `fields` updates) |
+| `response` (after the call) | `time`, `op_id`, `event`, `result` {`id`,`type`,`link`} or `error` |
+
+Writes are aborted (nothing sent) if the log cannot be appended or, for PATCH, the current record cannot be read.

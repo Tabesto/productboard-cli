@@ -20,6 +20,7 @@ type Client struct {
 	token      string
 	apiVersion string
 	allowWrite bool
+	auditPath  string
 }
 
 // New creates a new ProductBoard API client from config.
@@ -44,12 +45,18 @@ func New(cfg *config.Config) (*Client, error) {
 		}
 	}
 
+	auditPath, err := config.AuditLogPath()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Client{
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		baseURL:    strings.TrimRight(cfg.BaseURL, "/"),
 		token:      cfg.APIToken,
 		apiVersion: cfg.APIVersion,
 		allowWrite: cfg.WriteEnabled,
+		auditPath:  auditPath,
 	}, nil
 }
 
@@ -106,7 +113,34 @@ func (c *Client) write(method, path string, body any) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode request body: %w", err)
 	}
-	return c.do(method, "/v2"+path, nil, payload)
+
+	// Audit: log the intent (with the pre-update snapshot) before sending, and fail
+	// closed so that no write happens without a record that allows a revert.
+	entry := auditEntry{OpID: newOpID(), Event: "request", Method: method, Path: "/v2" + path, Body: body}
+	if method == "PATCH" {
+		prev, revert, err := c.snapshot(path, body)
+		if err != nil {
+			if apiErr, ok := err.(*APIError); ok {
+				return nil, apiErr
+			}
+			return nil, fmt.Errorf("update aborted: cannot read current value for the audit log: %w", err)
+		}
+		entry.Previous, entry.Revert = prev, revert
+	}
+	if err := c.appendAudit(entry); err != nil {
+		return nil, fmt.Errorf("write aborted: cannot write audit log %s: %w", c.auditPath, err)
+	}
+
+	resp, err := c.do(method, "/v2"+path, nil, payload)
+
+	result := auditEntry{OpID: entry.OpID, Event: "response"}
+	if err != nil {
+		result.Error = err.Error()
+	} else if ref, perr := ParseWriteRef(resp); perr == nil {
+		result.Result = ref
+	}
+	_ = c.appendAudit(result) // best effort: the request line already allows a revert
+	return resp, err
 }
 
 // do sends a request and returns the raw response body. Every non-GET request
